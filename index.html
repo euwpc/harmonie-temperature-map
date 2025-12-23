@@ -61,6 +61,56 @@
             color: #666; 
             font-size: 0.9em; 
         }
+        /* Timeline Slider Style */
+        .timeline-container {
+            margin: 30px auto;
+            width: 80%;
+            max-width: 900px;
+            background: #1e2a38;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+        .timeline-slider {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 8px;
+            border-radius: 5px;
+            background: #2c3e50;
+            outline: none;
+            margin: 20px 0;
+        }
+        .timeline-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: #3498db;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(52,152,219,0.8);
+        }
+        .timeline-slider::-moz-range-thumb {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: #3498db;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 0 10px rgba(52,152,219,0.8);
+        }
+        .timeline-labels {
+            display: flex;
+            justify-content: space-between;
+            color: #bdc3c7;
+            font-size: 0.9em;
+            margin-top: 8px;
+        }
+        #current-valid-time {
+            color: #ecf0f1;
+            font-size: 1.2em;
+            margin: 10px 0;
+        }
     </style>
 </head>
 <body>
@@ -96,7 +146,15 @@
         <div id="anim-gif-container">
             <img id="anim-gif" src="temperature_animation.gif" alt="Forecast Animation">
         </div>
-        
+
+        <div class="timeline-container">
+            <div id="current-valid-time">Valid: Loading...</div>
+            <input type="range" id="timeline-slider" class="timeline-slider" min="0" max="66" value="0" step="1">
+            <div class="timeline-labels" id="timeline-labels">
+                <!-- Filled dynamically by JavaScript -->
+            </div>
+        </div>
+
         <div class="controls">
             <button id="play-pause">Pause</button>
             <span>Speed:</span>
@@ -115,7 +173,7 @@
     <div class="footer">
         <p>Updated automatically every 3 hours via GitHub Actions</p>
         <p>Data source: Finnish Meteorological Institute (FMI) open data</p>
-        <p>Contour labels on maps • Valid time in EET on animations</p>
+        <p>Drag the slider to jump to any forecast hour • Valid time shown above</p>
     </div>
 
     <script>
@@ -155,19 +213,66 @@
             'precip': 'precip_animation.gif'
         };
 
+        // Timeline slider
+        const slider = document.getElementById('timeline-slider');
+        const currentTimeLabel = document.getElementById('current-valid-time');
+        const labelsContainer = document.getElementById('timeline-labels');
+        let maxFrames = 66;
+        slider.max = maxFrames;
+
+        // Dynamic timeline labels
+        function updateTimelineLabels() {
+            labelsContainer.innerHTML = '';
+            const now = new Date();
+            const runHour = Math.floor(now.getUTCHours() / 6) * 6;
+            const runDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), runHour));
+
+            const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            for (let i = 0; i < 7; i++) {  // 7 labels for better coverage
+                const date = new Date(runDate);
+                date.setUTCDate(date.getUTCDate() + i);
+                const dayName = days[date.getUTCDay()];
+                const dayNum = date.getUTCDate();
+                const span = document.createElement('span');
+                span.textContent = `${dayName} ${dayNum}`;
+                labelsContainer.appendChild(span);
+            }
+        }
+
+        // Approximate valid time
+        function updateValidTime(frameIndex) {
+            const now = new Date();
+            const runHour = Math.floor(now.getUTCHours() / 6) * 6;
+            const runDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), runHour));
+            const validDate = new Date(runDate.getTime() + frameIndex * 60 * 60 * 1000);
+            const eetDate = new Date(validDate.getTime() + 2 * 60 * 60 * 1000);
+            const options = { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' };
+            currentTimeLabel.textContent = 'Valid: ' + eetDate.toLocaleDateString('en-GB', options).replace(',', '') + ' EET';
+        }
+
+        // Slider control
+        slider.addEventListener('input', () => {
+            const frame = slider.value;
+            const val = animSelect.value;
+            animGif.src = animFiles[val] + '?frame=' + frame + '&ts=' + new Date().getTime();
+            updateValidTime(frame);
+        });
+
+        // Animation variable change
         animSelect.addEventListener('change', () => {
             const val = animSelect.value;
             const ts = new Date().getTime();
             animGif.src = animFiles[val] + '?ts=' + ts;
             downloadAnim.href = animFiles[val];
             downloadAnim.download = `HARMONIE_${val}_forecast.gif`;
+            slider.value = 0;
+            updateValidTime(0);
+            updateTimelineLabels();
         });
 
-        // Pause/Play + Speed (true pause with overlay)
-        const gif = document.getElementById('anim-gif');
+        // Pause/Play + Speed
         const playPauseBtn = document.getElementById('play-pause');
         const speedBtns = document.querySelectorAll('.speed-btn');
-        let currentSrc = gif.src;
         let isPaused = false;
 
         const overlay = document.createElement('div');
@@ -198,18 +303,18 @@
                 speedBtns.forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 const speed = btn.dataset.speed;
-                const baseSrc = animFiles[animSelect.value].split('?')[0];
-                const newSrc = baseSrc + '?speed=' + speed + '&ts=' + new Date().getTime();
-                gif.src = newSrc;
-                currentSrc = newSrc;
+                const val = animSelect.value;
+                animGif.src = animFiles[val] + '?speed=' + speed + '&ts=' + new Date().getTime();
                 if (isPaused) overlay.style.display = 'block';
             });
         });
 
+        // Initial load
         window.onload = () => {
             const initialSrc = animFiles['temperature'] + '?ts=' + new Date().getTime();
-            gif.src = initialSrc;
-            currentSrc = initialSrc;
+            animGif.src = initialSrc;
+            updateValidTime(0);
+            updateTimelineLabels();
         };
     </script>
 </body>
