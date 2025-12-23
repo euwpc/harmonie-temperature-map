@@ -47,6 +47,8 @@
         <option value="dewpoint">2m Dew Point (°C)</option>
         <option value="pressure">Mean Sea Level Pressure (hPa)</option>
         <option value="cape">CAPE (J/kg)</option>
+        <option value="windgust">Wind Gust (m/s)</option>
+<option value="precip">Precipitation (1h mm)</option>
     </select>
 
     <div class="section">
@@ -94,14 +96,18 @@
             'temperature': 'temperature.png',
             'dewpoint': 'dewpoint.png',
             'pressure': 'pressure.png',
-            'cape': 'cape.png'
+            'cape': 'cape.png',
+            'windgust': 'windgust.png',
+    'precip': 'precip.png'
         };
 
         const names = {
             'temperature': 'temperature',
             'dewpoint': 'dewpoint',
             'pressure': 'pressure',
-            'cape': 'CAPE'
+            'cape': 'CAPE',
+            'windgust': 'windgust.png',
+    'precip': 'precip.png'
         };
 
         select.addEventListener('change', () => {
