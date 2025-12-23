@@ -74,28 +74,34 @@ plt.title(f"HARMONIE 2m Temperature (°C)\nModel run: {run_time_str} | Analysis\
 plt.savefig("map.png", dpi=200, bbox_inches='tight')
 plt.close()
 
-# --- Step 6: Generate animation frames (one per forecast hour) ---
+# --- Step 6: Generate animation frames with contour labels ---
 frames = []
-forecast_hours = len(temp_c.time)  # Usually ~67
+forecast_hours = len(temp_c.time)
+
 for i in range(forecast_hours):
     fig = plt.figure(figsize=(10, 8))
     ax = plt.axes(projection=ccrs.PlateCarree())
-    hour_offset = i  # hours from analysis
+    hour_offset = i
     temp_slice = temp_c.isel(time=i)
     
-    temp_slice.plot.contourf(ax=ax, transform=ccrs.PlateCarree(), cmap=cmap, norm=norm, levels=100)
-    temp_slice.plot.contour(ax=ax, transform=ccrs.PlateCarree(), colors='black', linewidths=0.5, levels=range(-40, 51, 4))
+    # Filled color plot
+    cf = temp_slice.plot.contourf(ax=ax, transform=ccrs.PlateCarree(), cmap=cmap, norm=norm, levels=100)
+    
+    # Contour lines + labels (temperature numbers, just like main map)
+    cl = temp_slice.plot.contour(ax=ax, transform=ccrs.PlateCarree(), colors='black', linewidths=0.5, levels=range(-40, 51, 2))
+    ax.clabel(cl, inline=True, fontsize=8, fmt="%d")
     
     ax.coastlines(resolution='10m')
+    ax.gridlines(draw_labels=True)
     ax.set_extent([19, 30, 56, 61])
-    plt.title(f"+{hour_offset}h | Run: {run_time_str}")
+    plt.title(f"HARMONIE 2m Temperature (°C)\n+{hour_offset}h | Run: {run_time_str}")
     
     frame_path = f"frame_{i:03d}.png"
     plt.savefig(frame_path, dpi=150, bbox_inches='tight')
     plt.close()
     frames.append(Image.open(frame_path))
 
-# Save animated GIF (loop forever, 500ms per frame)
+# Save animated GIF (base duration 500ms per frame)
 frames[0].save("animation.gif", save_all=True, append_images=frames[1:], duration=500, loop=0)
 
 print("Main map + contour labels + animation generated")
