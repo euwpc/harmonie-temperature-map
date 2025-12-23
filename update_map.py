@@ -4,6 +4,7 @@ import xarray as xr
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 from matplotlib.colors import ListedColormap, Normalize
+from matplotlib.patheffects import withStroke
 import matplotlib
 import datetime
 import os
