@@ -33,21 +33,6 @@
         }
         .download-btn:hover { background: #0050a0; }
         .section { margin: 40px 0; }
-        .controls { margin: 20px 0; }
-        .speed-btn {
-            padding: 8px 16px;
-            margin: 0 5px;
-            background: #444;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        .speed-btn.active { background: #0066cc; }
-        #anim-gif-container {
-            position: relative;
-            display: inline-block;
-        }
         select { 
             padding: 10px; 
             font-size: 1.1em; 
@@ -64,6 +49,12 @@
     </style>
 </head>
 <body>
+    <h1>Select View</h1>
+    <select id="view-select">
+        <option value="">Focused View (Southern Finland & Baltics)</option>
+        <option value="_wide">Wide View (Full Scandinavia + Northern Europe)</option>
+    </select>
+
     <h1>Select Analysis Map</h1>
     <select id="analysis-select">
         <option value="temperature">2m Temperature (°C)</option>
@@ -93,18 +84,7 @@
     </select>
 
     <div class="section">
-        <div id="anim-gif-container">
-            <img id="anim-gif" src="temperature_animation.gif" alt="Forecast Animation">
-        </div>
-        
-        <div class="controls">
-            <button id="play-pause">Pause</button>
-            <span>Speed:</span>
-            <button class="speed-btn" data-speed="0.5">0.5x</button>
-            <button class="speed-btn active" data-speed="1">1x</button>
-            <button class="speed-btn" data-speed="2">2x</button>
-            <button class="speed-btn" data-speed="4">4x</button>
-        </div>
+        <img id="anim-gif" src="temperature_animation.gif" alt="Forecast Animation">
         
         <br>
         <a id="download-anim" href="temperature_animation.gif" download="HARMONIE_temperature_forecast.gif" class="download-btn">
@@ -119,6 +99,10 @@
     </div>
 
     <script>
+        // View selector
+        const viewSelect = document.getElementById('view-select');
+        let currentSuffix = '';
+
         // Analysis dropdown
         const analysisSelect = document.getElementById('analysis-select');
         const analysisMap = document.getElementById('analysis-map');
@@ -132,14 +116,6 @@
             'windgust': 'windgust.png',
             'precip': 'precip.png'
         };
-
-        analysisSelect.addEventListener('change', () => {
-            const val = analysisSelect.value;
-            const ts = new Date().getTime();
-            analysisMap.src = analysisFiles[val] + '?ts=' + ts;
-            downloadAnalysis.href = analysisFiles[val];
-            downloadAnalysis.download = `HARMONIE_${val}.png`;
-        });
 
         // Animation dropdown
         const animSelect = document.getElementById('animation-select');
@@ -155,61 +131,33 @@
             'precip': 'precip_animation.gif'
         };
 
-        animSelect.addEventListener('change', () => {
-            const val = animSelect.value;
+        // Update all images based on current selections
+        function updateAll() {
+            const analysisVal = analysisSelect.value;
+            const animVal = animSelect.value;
             const ts = new Date().getTime();
-            animGif.src = animFiles[val] + '?ts=' + ts;
-            downloadAnim.href = animFiles[val];
-            downloadAnim.download = `HARMONIE_${val}_forecast.gif`;
+
+            analysisMap.src = analysisFiles[analysisVal].replace('.png', currentSuffix + '.png') + '?ts=' + ts;
+            downloadAnalysis.href = analysisFiles[analysisVal].replace('.png', currentSuffix + '.png');
+            downloadAnalysis.download = `HARMONIE_${analysisVal}${currentSuffix}.png`;
+
+            animGif.src = animFiles[animVal].replace('.gif', currentSuffix + '_animation.gif') + '?ts=' + ts;
+            downloadAnim.href = animFiles[animVal].replace('.gif', currentSuffix + '_animation.gif');
+            downloadAnim.download = `HARMONIE_${animVal}${currentSuffix}_forecast.gif`;
+        }
+
+        // Listeners
+        viewSelect.addEventListener('change', () => {
+            currentSuffix = viewSelect.value;
+            updateAll();
         });
 
-        // Pause/Play + Speed (true pause with overlay)
-        const gif = document.getElementById('anim-gif');
-        const playPauseBtn = document.getElementById('play-pause');
-        const speedBtns = document.querySelectorAll('.speed-btn');
-        let currentSrc = gif.src;
-        let isPaused = false;
+        analysisSelect.addEventListener('change', updateAll);
+        animSelect.addEventListener('change', updateAll);
 
-        const overlay = document.createElement('div');
-        overlay.style.position = 'absolute';
-        overlay.style.top = '0';
-        overlay.style.left = '0';
-        overlay.style.width = '100%';
-        overlay.style.height = '100%';
-        overlay.style.background = 'transparent';
-        overlay.style.display = 'none';
-        overlay.style.cursor = 'default';
-        document.getElementById('anim-gif-container').appendChild(overlay);
-
-        playPauseBtn.addEventListener('click', () => {
-            if (isPaused) {
-                overlay.style.display = 'none';
-                playPauseBtn.textContent = 'Pause';
-                isPaused = false;
-            } else {
-                overlay.style.display = 'block';
-                playPauseBtn.textContent = 'Play';
-                isPaused = true;
-            }
-        });
-
-        speedBtns.forEach(btn => {
-            btn.addEventListener('click', () => {
-                speedBtns.forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                const speed = btn.dataset.speed;
-                const baseSrc = animFiles[animSelect.value].split('?')[0];
-                const newSrc = baseSrc + '?speed=' + speed + '&ts=' + new Date().getTime();
-                gif.src = newSrc;
-                currentSrc = newSrc;
-                if (isPaused) overlay.style.display = 'block';
-            });
-        });
-
+        // Initial load
         window.onload = () => {
-            const initialSrc = animFiles['temperature'] + '?ts=' + new Date().getTime();
-            gif.src = initialSrc;
-            currentSrc = initialSrc;
+            updateAll();
         };
     </script>
 </body>
