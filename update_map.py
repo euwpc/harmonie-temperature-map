@@ -9,7 +9,7 @@ import datetime
 import os
 import glob
 from PIL import Image
-import pandas as pd  # Added for nice time formatting
+import pandas as pd
 
 matplotlib.use('Agg')
 
@@ -50,7 +50,7 @@ cape = ds['atmosphere_specific_convective_available_potential_energy_59']
 windgust_ms = ds['wind_speed_of_gust_417']
 precip_mm = ds['precipitation_amount_353']
 
-# --- Step 4: High-res temperature colormap ---
+# --- Step 4: Colormaps ---
 tree = ET.parse("temperature_color_table_high.qml")
 root = tree.getroot()
 items = []
@@ -66,7 +66,6 @@ temp_colors = [i[1] for i in items]
 temp_cmap = ListedColormap(temp_colors)
 temp_norm = Normalize(vmin=-40, vmax=50)
 
-# Colormaps for other variables
 dewpoint_cmap = temp_cmap
 dewpoint_norm = Normalize(vmin=-40, vmax=30)
 
@@ -80,7 +79,7 @@ windgust_cmap = plt.cm.plasma
 windgust_norm = Normalize(vmin=0, vmax=25)
 
 precip_cmap = plt.cm.Blues
-precip_norm = LogNorm(vmin=0.1, vmax=20)
+precip_norm = Normalize(vmin=0, vmax=10)  # Linear norm for better visibility (0-10 mm/h)
 
 # --- Step 5: Helper to get analysis slice ---
 def get_analysis(var):
@@ -97,7 +96,7 @@ variables = {
     'pressure':    {'var': pressure_hpa, 'cmap': pressure_cmap, 'norm': pressure_norm, 'unit': 'hPa', 'title': 'MSLP (hPa)', 'levels': range(950, 1051, 4), 'file': 'pressure.png', 'anim': 'pressure_animation.gif'},
     'cape':        {'var': cape, 'cmap': cape_cmap, 'norm': cape_norm, 'unit': 'J/kg', 'title': 'CAPE (J/kg)', 'levels': range(0, 2001, 200), 'file': 'cape.png', 'anim': 'cape_animation.gif'},
     'windgust':    {'var': windgust_ms, 'cmap': windgust_cmap, 'norm': windgust_norm, 'unit': 'm/s', 'title': 'Wind Gust (m/s)', 'levels': range(0, 26, 2), 'file': 'windgust.png', 'anim': 'windgust_animation.gif'},
-    'precip':      {'var': precip_mm, 'cmap': precip_cmap, 'norm': precip_norm, 'unit': 'mm/h', 'title': 'Precipitation (1h)', 'levels': [0.1, 0.5, 1, 2, 5, 10, 20], 'file': 'precip.png', 'anim': 'precip_animation.gif'}
+    'precip':      {'var': precip_mm, 'cmap': precip_cmap, 'norm': precip_norm, 'unit': 'mm/h', 'title': 'Precipitation (1h)', 'levels': [0, 0.1, 0.5, 1, 2, 5, 10], 'file': 'precip.png', 'anim': 'precip_animation.gif'}
 }
 
 for key, conf in variables.items():
@@ -123,7 +122,7 @@ for key, conf in variables.items():
     # Animation for this variable
     frames = []
     time_dim = 'time' if 'time' in conf['var'].dims else 'time_h'
-    time_values = ds[time_dim].values  # numpy datetime64 array
+    time_values = ds[time_dim].values
     
     for i in range(len(time_values)):
         fig = plt.figure(figsize=(10, 8))
@@ -139,7 +138,7 @@ for key, conf in variables.items():
         ax.gridlines(draw_labels=True)
         ax.set_extent([19, 30, 56, 61])
         
-        # Format valid time in EET (UTC+2)
+        # Valid time in EET
         valid_dt = pd.to_datetime(time_values[i])
         valid_dt_eet = valid_dt + pd.Timedelta(hours=2)
         valid_str = valid_dt_eet.strftime("%a %d %b %H:%M EET")
@@ -153,7 +152,7 @@ for key, conf in variables.items():
 
     frames[0].save(conf['anim'], save_all=True, append_images=frames[1:], duration=500, loop=0)
 
-    # Clean frames for this variable
+    # Clean frames
     for f in glob.glob(f"frame_{key}_*.png"):
         os.remove(f)
 
