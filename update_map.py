@@ -3,7 +3,7 @@ import xml.etree.ElementTree as ET
 import xarray as xr
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
-from matplotlib.colors import ListedColormap, Normalize, LogNorm
+from matplotlib.colors import ListedColormap, Normalize
 import matplotlib
 import datetime
 import os
@@ -12,6 +12,22 @@ from PIL import Image
 import pandas as pd
 
 matplotlib.use('Agg')
+
+# --- Helper to parse QML color ramp ---
+def parse_qml_colormap(qml_file, vmin, vmax):
+    tree = ET.parse(qml_file)
+    root = tree.getroot()
+    items = []
+    for item in root.findall(".//colorrampshader/item"):
+        value = float(item.get('value'))
+        color_hex = item.get('color').lstrip('#')
+        r = int(color_hex[0:2], 16) / 255.0
+        g = int(color_hex[2:4], 16) / 255.0
+        b = int(color_hex[4:6], 16) / 255.0
+        items.append((value, (r, g, b, 1.0)))
+    items.sort(key=lambda x: x[0])
+    colors = [i[1] for i in items]
+    return ListedColormap(colors), Normalize(vmin=vmin, vmax=vmax)
 
 # --- Step 1: Latest model run ---
 wfs_url = "https://opendata.fmi.fi/wfs?service=WFS&version=2.0.0&request=getFeature&storedquery_id=fmi::forecast::harmonie::surface::grid"
@@ -50,35 +66,21 @@ cape = ds['atmosphere_specific_convective_available_potential_energy_59']
 windgust_ms = ds['wind_speed_of_gust_417']
 precip_mm = ds['precipitation_amount_353']
 
-# --- Step 4: High-res temperature colormap ---
-tree = ET.parse("temperature_color_table_high.qml")
-root = tree.getroot()
-items = []
-for item in root.findall(".//item"):
-    value = float(item.get('value'))
-    color_hex = item.get('color').lstrip('#')
-    r = int(color_hex[0:2], 16) / 255.0
-    g = int(color_hex[2:4], 16) / 255.0
-    b = int(color_hex[4:6], 16) / 255.0
-    items.append((value, (r, g, b, 1.0)))
-items.sort(key=lambda x: x[0])
-temp_colors = [i[1] for i in items]
-temp_cmap = ListedColormap(temp_colors)
-temp_norm = Normalize(vmin=-40, vmax=50)
+# --- Step 4: Load custom colormaps from QML files ---
+# Make sure these files exist in your repo: cape.qml, mslp.qml, windgust.qml
+temp_cmap, temp_norm = parse_qml_colormap("temperature_color_table_high.qml", vmin=-40, vmax=50)
 
-# Colormaps for other variables
+cape_cmap, cape_norm = parse_qml_colormap("cape_color_table.qml", vmin=0, vmax=5000)
+
+pressure_cmap, pressure_norm = parse_qml_colormap("pressure_color_table.qml", vmin=890, vmax=1064)
+
+windgust_cmap, windgust_norm = parse_qml_colormap("wind_gust_color_table.qml", vmin=0, vmax=50)
+
+# Dewpoint uses temperature colormap
 dewpoint_cmap = temp_cmap
 dewpoint_norm = Normalize(vmin=-40, vmax=30)
 
-pressure_cmap = plt.cm.viridis_r
-pressure_norm = Normalize(vmin=950, vmax=1050)
-
-cape_cmap = plt.cm.YlOrRd
-cape_norm = Normalize(vmin=0, vmax=2000)
-
-windgust_cmap = plt.cm.plasma
-windgust_norm = Normalize(vmin=0, vmax=25)
-
+# Precip keeps Blues (or you can make a QML for it later)
 precip_cmap = plt.cm.Blues
 precip_norm = Normalize(vmin=0, vmax=10)
 
@@ -130,15 +132,15 @@ for view_key, view_conf in views.items():
         plt.savefig(f"{var_key}{suffix}.png", dpi=200, bbox_inches='tight')
         plt.close()
 
-        # Animation with 1h steps up to +48h, then 3h steps after
+        # Animation (with your optimizations if you kept them)
         frames = []
         time_dim = 'time' if 'time' in conf['var'].dims else 'time_h'
         time_values = ds[time_dim].values
         
         for i in range(len(time_values)):
-            # Skip frames after +48h that are not on 3-hour steps
-            if i >= 48 and (i - 48) % 3 != 0:
-                continue
+            # Optional: 1h up to +48h, then 3h — uncomment if you want
+            # if i >= 48 and (i - 48) % 3 != 0:
+            #     continue
 
             fig = plt.figure(figsize=(12 if view_key == 'wide' else 10, 8))
             ax = plt.axes(projection=ccrs.PlateCarree())
@@ -166,13 +168,11 @@ for view_key, view_conf in views.items():
 
         frames[0].save(f"{var_key}{suffix}_animation.gif", save_all=True, append_images=frames[1:], duration=500, loop=0)
 
-        # Clean frames
         for f in glob.glob(f"frame_{var_key}{suffix}_*.png"):
             os.remove(f)
 
-# --- Cleanup large file ---
+# --- Cleanup ---
 if os.path.exists("harmonie.nc"):
     os.remove("harmonie.nc")
-    print("Removed large harmonie.nc file")
 
-print("All analysis maps + animations for focused and wide views generated and cleanup complete")
+print("All maps + animations generated with custom colormaps")
