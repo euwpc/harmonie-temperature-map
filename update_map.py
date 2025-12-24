@@ -64,7 +64,7 @@ dewpoint_c = ds['dew_point_temperature_10'] - 273.15
 pressure_hpa = ds['air_pressure_at_sea_level_1'] / 100
 cape = ds['atmosphere_specific_convective_available_potential_energy_59']
 windgust_ms = ds['wind_speed_of_gust_417']
-precip_mm = ds['precipitation_amount_353']
+# precip_mm removed — no longer used
 
 # --- Step 4: Load custom colormaps from QML files ---
 temp_cmap, temp_norm = parse_qml_colormap("temperature_color_table_high.qml", vmin=-40, vmax=50)
@@ -74,9 +74,6 @@ cape_cmap, cape_norm = parse_qml_colormap("cape_color_table.qml", vmin=0, vmax=5
 pressure_cmap, pressure_norm = parse_qml_colormap("pressure_color_table.qml", vmin=890, vmax=1064)
 
 windgust_cmap, windgust_norm = parse_qml_colormap("wind_gust_color_table.qml", vmin=0, vmax=50)
-
-# NEW: Your high-resolution precipitation color table
-precip_cmap, precip_norm = parse_qml_colormap("precipitation_color_table.qml", vmin=0, vmax=125)
 
 # Dewpoint uses temperature colormap
 dewpoint_cmap = temp_cmap
@@ -102,7 +99,7 @@ variables = {
     'pressure':    {'var': pressure_hpa, 'cmap': pressure_cmap, 'norm': pressure_norm, 'unit': 'hPa', 'title': 'MSLP (hPa)', 'levels': range(950, 1051, 4)},
     'cape':        {'var': cape, 'cmap': cape_cmap, 'norm': cape_norm, 'unit': 'J/kg', 'title': 'CAPE (J/kg)', 'levels': range(0, 2001, 200)},
     'windgust':    {'var': windgust_ms, 'cmap': windgust_cmap, 'norm': windgust_norm, 'unit': 'm/s', 'title': 'Wind Gust (m/s)', 'levels': range(0, 26, 2)},
-    'precip':      {'var': precip_mm, 'cmap': precip_cmap, 'norm': precip_norm, 'unit': 'mm/h', 'title': 'Precipitation (1h)', 'levels': [0, 0.1, 0.2, 0.5, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 20, 24, 30, 40, 50, 60, 80, 100, 125]}
+    # 'precip' completely removed
 }
 
 # --- Generate for each view ---
@@ -136,7 +133,7 @@ for view_key, view_conf in views.items():
         data.plot.contourf(ax=ax, transform=ccrs.PlateCarree(), cmap=conf['cmap'], norm=conf['norm'], levels=100,
                            cbar_kwargs={'label': conf['unit'], 'shrink': 0.8})
         cl = data.plot.contour(ax=ax, transform=ccrs.PlateCarree(), colors='black', linewidths=0.5, levels=conf['levels'])
-        ax.clabel(cl, inline=True, fontsize=8, fmt="%.1f" if var_key == 'precip' else "%d")
+        ax.clabel(cl, inline=True, fontsize=8, fmt="%d")  # No special case for precip anymore
         
         ax.coastlines(resolution='10m')
         ax.gridlines(draw_labels=True)
@@ -163,7 +160,7 @@ for view_key, view_conf in views.items():
 
             slice_data.plot.contourf(ax=ax, transform=ccrs.PlateCarree(), cmap=conf['cmap'], norm=conf['norm'], levels=100)
             cl = slice_data.plot.contour(ax=ax, transform=ccrs.PlateCarree(), colors='black', linewidths=0.5, levels=conf['levels'])
-            ax.clabel(cl, inline=True, fontsize=8, fmt="%.1f" if var_key == 'precip' else "%d")
+            ax.clabel(cl, inline=True, fontsize=8, fmt="%d")
 
             ax.coastlines(resolution='10m')
             ax.gridlines(draw_labels=True)
@@ -176,7 +173,7 @@ for view_key, view_conf in views.items():
             plt.title(f"HARMONIE {conf['title']}\nValid: {valid_str} | +{hour_offset}h from run {run_time_str}")
 
             frame_path = f"frame_{var_key}{suffix}_{i:03d}.png"
-            plt.savefig(frame_path, dpi=110, bbox_inches='tight')
+            plt.savefig(frame_path, dpi=95, bbox_inches='tight')
             plt.close()
             frames.append(Image.open(frame_path))
 
