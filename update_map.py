@@ -4,7 +4,6 @@ import xarray as xr
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 from matplotlib.colors import ListedColormap, Normalize
-from matplotlib.patheffects import withStroke
 import matplotlib
 import datetime
 import os
@@ -144,22 +143,22 @@ for view_key, view_conf in views.items():
         ax.gridlines(draw_labels=True)
         ax.set_extent(extent)
         
-        # Watermark in bottom-right — NO BOX
-        fig.text(0.98, 0.02, '© tormiinfo.ee', fontsize=11, color='white',
-                 ha='right', va='bottom', alpha=0.85,
-                 path_effects=[matplotlib.patheffects.withStroke(linewidth=2, foreground='black')])
+        # Watermark in bottom-right
+        fig.text(0.98, 0.02, '© tormiinfo.ee', fontsize=12, color='white', alpha=0.9,
+                 ha='right', va='bottom',
+                 bbox=dict(facecolor='black', alpha=0.6, pad=5, edgecolor='none'))
         
         plt.title(f"HARMONIE {conf['title']}\nModel run: {run_time_str} | Analysis\nMin: {min_val:.1f} {conf['unit']} | Max: {max_val:.1f} {conf['unit']}")
         plt.savefig(f"{var_key}{suffix}.png", dpi=200, bbox_inches='tight')
         plt.close()
 
-        # Animation
+        # Animation — 1h steps until +48h, then 3h steps
         frames = []
         time_dim = 'time' if 'time' in conf['var'].dims else 'time_h'
         time_values = ds[time_dim].values
         
         for i in range(len(time_values)):
-            # After +48h, use 3-hour steps
+            # After hour 48, use 3-hour steps
             if i >= 48 and (i - 48) % 3 != 0:
                 continue
 
@@ -167,22 +166,6 @@ for view_key, view_conf in views.items():
             ax = plt.axes(projection=ccrs.PlateCarree())
             slice_data = conf['var'].isel(**{time_dim: i})
             hour_offset = i
-
-            # Crop slice to current view for accurate per-frame min/max
-            lon_min, lon_max, lat_min, lat_max = extent
-            try:
-                frame_cropped = slice_data.sel(
-                    lon=slice(lon_min, lon_max),
-                    lat=slice(lat_max, lat_min),
-                    method='nearest'
-                )
-                if frame_cropped.size == 0:
-                    raise ValueError("Empty crop")
-                frame_min = float(frame_cropped.min())
-                frame_max = float(frame_cropped.max())
-            except:
-                frame_min = float(slice_data.min())
-                frame_max = float(slice_data.max())
 
             slice_data.plot.contourf(ax=ax, transform=ccrs.PlateCarree(), cmap=conf['cmap'], norm=conf['norm'], levels=100)
             cl = slice_data.plot.contour(ax=ax, transform=ccrs.PlateCarree(), colors='black', linewidths=0.5, levels=conf['levels'])
@@ -192,16 +175,16 @@ for view_key, view_conf in views.items():
             ax.gridlines(draw_labels=True)
             ax.set_extent(extent)
 
-            # Watermark in bottom-right — NO BOX
-            fig.text(0.98, 0.02, '© tormiinfo.ee', fontsize=11, color='white',
-                     ha='right', va='bottom', alpha=0.85,
-                     path_effects=[matplotlib.patheffects.withStroke(linewidth=2, foreground='black')])
+            # Watermark in bottom-right
+            fig.text(0.98, 0.02, '© tormiinfo.ee', fontsize=12, color='white', alpha=0.9,
+                     ha='right', va='bottom',
+                     bbox=dict(facecolor='black', alpha=0.6, pad=5, edgecolor='none'))
             
             valid_dt = pd.to_datetime(time_values[i])
             valid_dt_eet = valid_dt + pd.Timedelta(hours=2)
             valid_str = valid_dt_eet.strftime("%a %d %b %H:%M EET")
             
-            plt.title(f"HARMONIE {conf['title']}\nValid: {valid_str} | +{hour_offset}h from run {run_time_str}\nMin: {frame_min:.1f} {conf['unit']} | Max: {frame_max:.1f} {conf['unit']}")
+            plt.title(f"HARMONIE {conf['title']}\nValid: {valid_str} | +{hour_offset}h from run {run_time_str}")
 
             frame_path = f"frame_{var_key}{suffix}_{i:03d}.png"
             plt.savefig(frame_path, dpi=110, bbox_inches='tight')
