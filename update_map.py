@@ -70,7 +70,7 @@ temp_cmap, temp_norm = parse_qml_colormap("temperature_color_table_high.qml", vm
 
 cape_cmap, cape_norm = parse_qml_colormap("cape_color_table.qml", vmin=0, vmax=5000)
 
-pressure_cmap, pressure_norm = parse_qml_colormap("pressure_color_table.qml", vmin=870, vmax=1070)
+pressure_cmap, pressure_norm = parse_qml_colormap("pressure_color_table.qml", vmin=1070, vmax=870)  # Wider range for better color mapping
 
 windgust_cmap, windgust_norm = parse_qml_colormap("wind_gust_color_table.qml", vmin=0, vmax=50)
 
@@ -112,7 +112,7 @@ for view_key, view_conf in views.items():
     lon_min, lon_max, lat_min, lat_max = extent
 
     for var_key, conf in variables.items():
-        # Analysis map — reduced size
+        # Analysis map — smaller size only for static PNGs
         data = get_analysis(conf['var'])
         
         # Crop for min/max specific to this view
@@ -124,8 +124,8 @@ for view_key, view_conf in views.items():
             min_val = float(data.min(skipna=True))
             max_val = float(data.max(skipna=True))
         
-        # Smaller figure for analysis map
-        fig = plt.figure(figsize=(10 if view_key == 'wide' else 9, 8))  # Reduced from 14/12 to 10/9
+        # Smaller figure for analysis map only
+        fig = plt.figure(figsize=(8 if view_key == 'wide' else 7, 6))  # Smaller static maps
         ax = plt.axes(projection=ccrs.PlateCarree())
         data.plot.contourf(ax=ax, transform=ccrs.PlateCarree(), cmap=conf['cmap'], norm=conf['norm'], levels=100,
                            cbar_kwargs={'label': conf['unit'], 'shrink': 0.8})
@@ -137,22 +137,22 @@ for view_key, view_conf in views.items():
         ax.set_extent(extent)
         
         plt.title(f"HARMONIE {conf['title']}\nModel run: {run_time_str} | Analysis\nMin: {min_val:.1f} {conf['unit']} | Max: {max_val:.1f} {conf['unit']}")
-        plt.savefig(f"{var_key}{suffix}.png", dpi=180, bbox_inches='tight')  # Slightly lower DPI for smaller file
+        plt.savefig(f"{var_key}{suffix}.png", dpi=180, bbox_inches='tight')
         plt.close()
 
-        # Animation — min/max per frame for current view
+        # Animation — unchanged size (as requested)
         frame_paths = []
         time_dim = 'time' if 'time' in conf['var'].dims else 'time_h'
         time_values = ds[time_dim].values
         
-        fig_width = 10 if view_key == 'wide' else 9  # Smaller than before (was 12/10)
-        fig_height = 7  # Reduced height
+        fig_width = 12 if view_key == 'wide' else 10  # Kept original animation size
+        fig_height = 8
         
         for i in range(len(time_values)):
             if i >= 48 and (i - 48) % 3 != 0:
                 continue
 
-            fig = plt.figure(figsize=(fig_width, fig_height), dpi=105)  # Consistent smaller size
+            fig = plt.figure(figsize=(fig_width, fig_height), dpi=115)
             ax = plt.axes(projection=ccrs.PlateCarree())
             slice_data = conf['var'].isel(**{time_dim: i})
             hour_offset = i
@@ -167,6 +167,11 @@ for view_key, view_conf in views.items():
                 slice_max = float(slice_data.max(skipna=True))
 
             slice_data.plot.contourf(ax=ax, transform=ccrs.PlateCarree(), cmap=conf['cmap'], norm=conf['norm'], levels=100)
+            if var_key == 'windgust':
+    # Thinner white lines, less clutter, smaller labels
+    cl = data.plot.contour(ax=ax, transform=ccrs.PlateCarree(), colors='white', linewidths=0.35, levels=conf['levels'], alpha=0.7)
+    ax.clabel(cl, inline=True, fontsize=6, fmt="%d", colors='black', inline_spacing=3)
+else:
             cl = slice_data.plot.contour(ax=ax, transform=ccrs.PlateCarree(), colors='black', linewidths=0.5, levels=conf['levels'])
             ax.clabel(cl, inline=True, fontsize=8, fmt="%d")
 
