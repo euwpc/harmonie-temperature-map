@@ -9,6 +9,7 @@ import datetime
 import os
 import glob
 import imageio  # For MP4 generation
+import pandas as pd
 
 matplotlib.use('Agg')
 
