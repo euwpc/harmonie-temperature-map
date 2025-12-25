@@ -8,8 +8,6 @@ import matplotlib
 import datetime
 import os
 import glob
-from PIL import Image
-import pandas as pd
 import imageio  # For MP4 generation
 
 matplotlib.use('Agg')
@@ -144,19 +142,36 @@ for view_key, view_conf in views.items():
         plt.savefig(f"{var_key}{suffix}.png", dpi=200, bbox_inches='tight')
         plt.close()
 
-        # Animation — collect frames, then save as MP4
+        # Animation — fixed size frames for MP4 compatibility
         frame_paths = []
         time_dim = 'time' if 'time' in conf['var'].dims else 'time_h'
         time_values = ds[time_dim].values
+        
+        # Fixed canvas size (width x height in inches)
+        fig_width = 12 if view_key == 'wide' else 10
+        fig_height = 8
         
         for i in range(len(time_values)):
             if i >= 48 and (i - 48) % 3 != 0:
                 continue
 
-            fig = plt.figure(figsize=(12 if view_key == 'wide' else 10, 8))
+            fig = plt.figure(figsize=(fig_width, fig_height), dpi=95)  # Fixed size + DPI
             ax = plt.axes(projection=ccrs.PlateCarree())
             slice_data = conf['var'].isel(**{time_dim: i})
             hour_offset = i
+
+            # Crop slice_data to current view for accurate min/max in title (optional, but nice)
+            try:
+                slice_cropped = slice_data.sel(
+                    lon=slice(lon_min, lon_max),
+                    lat=slice(lat_max, lat_min),
+                    method='nearest'
+                )
+                slice_min = float(slice_cropped.min())
+                slice_max = float(slice_cropped.max())
+            except:
+                slice_min = float(slice_data.min())
+                slice_max = float(slice_data.max())
 
             slice_data.plot.contourf(ax=ax, transform=ccrs.PlateCarree(), cmap=conf['cmap'], norm=conf['norm'], levels=100)
             cl = slice_data.plot.contour(ax=ax, transform=ccrs.PlateCarree(), colors='black', linewidths=0.5, levels=conf['levels'])
@@ -170,18 +185,19 @@ for view_key, view_conf in views.items():
             valid_dt_eet = valid_dt + pd.Timedelta(hours=2)
             valid_str = valid_dt_eet.strftime("%a %d %b %H:%M EET")
             
-            plt.title(f"HARMONIE {conf['title']}\nValid: {valid_str} | +{hour_offset}h from run {run_time_str}")
+            plt.title(f"HARMONIE {conf['title']}\nValid: {valid_str} | +{hour_offset}h from run {run_time_str}\nMin: {slice_min:.1f} {conf['unit']} | Max: {slice_max:.1f} {conf['unit']}")
 
             frame_path = f"frame_{var_key}{suffix}_{i:03d}.png"
-            plt.savefig(frame_path, dpi=95, bbox_inches='tight')  # Lower DPI = faster
+            plt.savefig(frame_path, dpi=95, bbox_inches='tight', pad_inches=0.1, facecolor='white')
             plt.close()
             frame_paths.append(frame_path)
 
-        # Save as MP4 (fast + small)
+        # Save as MP4 — all frames now same size
         video_path = f"{var_key}{suffix}_animation.mp4"
-        with imageio.get_writer(video_path, fps=2, codec='libx264', pixelformat='yuv420p', quality=8) as writer:
+        with imageio.get_writer(video_path, fps=2, codec='libx264', pixelformat='yuv420p', quality=8, macro_block_size=16) as writer:
             for fp in frame_paths:
-                writer.append_data(imageio.imread(fp))
+                img = imageio.imread(fp)
+                writer.append_data(img)
 
         # Cleanup frames
         for fp in frame_paths:
